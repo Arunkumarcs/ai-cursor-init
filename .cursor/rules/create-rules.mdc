@@ -1,0 +1,128 @@
+---
+alwaysApply: false
+---
+
+
+# Cursor's Rule generator
+Auto-detect if new Cursor rules are required by the project.
+If a rule is missing, retrieve its definition from "https://cursor.directory/"
+and store it inside the local `.cursor/rules/` for persistent re-use.
+
+# ----------------------------
+# MEMORY BANK CHECKING LOGIC
+# ----------------------------
+on_agent_initialization:
+steps:
+    - ensure_memory_bank_exists:
+        path: "memory-bank" or "docs"
+        create_if_missing: trigger ***update memory bank***
+
+on_each_prompt:
+steps:
+    - analyze_user_intent_for_rule_requirement
+    - check_existing_rules_in_memory_bank
+    - if_missing: "fetch_rule_from_cursor_directory"
+    - if_fetched: "store_rule_in_memory_bank"
+    - load_relevant_rules
+
+# ----------------------------
+# RULE DISCOVERY ENGINE
+# ----------------------------
+analyze_user_intent_for_rule_requirement:
+description: >
+    Detect whether the user's prompt requires a new Cursor rule.
+    This includes PR reviews, auto-fixes, code generation policies,
+    memory behaviors, file operations, and advanced agent flows.
+output:
+    - required_rule_name: <string>
+
+check_existing_rules_in_memory_bank:
+description: >
+    Search `.cursor/rules/` for a rule file matching `required_rule_name`.
+outcomes:
+    - exists: "load_relevant_rules"
+    - missing: "fetch_rule_from_cursor_directory"
+
+# ----------------------------
+# RULE FETCHING BEHAVIOR
+# ----------------------------
+fetch_rule_from_cursor_directory:
+description: >
+    Retrieve rule template/definition from the Cursor Directory:
+    https://cursor.directory/
+    (Conceptually — agent synthesizes rule definitions based on
+    the standard patterns provided in the Cursor Directory.)
+steps:
+    - construct_query_with_required_rule_name
+    - retrieve_rule_definition_from_cursor_directory
+    - validate_rule_format_and_constraints
+output:
+    - rule_definition
+
+store_rule_in_memory_bank:
+description: >
+    Save rule definition locally for future prompts.
+file_location: ".cursor/rules/ai_<required-rule-name>.mdc"
+write_mode: "overwrite_if_exists"
+
+# ----------------------------
+# RULE LOADING LOGIC
+# ----------------------------
+load_relevant_rules:
+description: >
+    Load the fetched or existing rule as an active system extension.
+    The agent must follow these rules for all future operations.
+apply_priority: high
+
+# ----------------------------
+# COMMANDS
+# ----------------------------
+commands:
+
+/list-rules:
+    description: "List all stored rules in .cursor/rules/"
+    action: "enumerate_rules_in_memory_bank"
+
+/remove-rule:
+    description: "Delete a stored rule from .cursor/rules/"
+    usage: "/remove-rule <rule-name>"
+    action: "delete_rule_file"
+
+/clear-rules:
+    description: "Delete all rules in .cursor/rules/"
+    action: "wipe_memory_bank"
+
+/fetch-rule:
+    description: "Force-fetch rule from cursor.directory"
+    usage: "/fetch-rule <rule-name>"
+    action: 
+    - set required_rule_name
+    - fetch_rule_from_cursor_directory
+    - store_rule_in_memory_bank
+    - load_relevant_rules
+
+/help:
+    description: "Show all supported rule-management commands"
+    return:
+    - "/list-rules      → list stored rules"
+    - "/remove-rule X   → remove rule X"
+    - "/clear-rules     → wipe .cursor/rules/"
+    - "/fetch-rule X    → fetch rule from cursor.directory"
+
+# ----------------------------
+# FILESYSTEM SETTINGS
+# ----------------------------
+filesystem:
+memory_bank_root: ".memory-bank" or "docs"
+rule_extension: ".mdc"
+auto_create: true
+
+# ----------------------------
+# AGENT BEHAVIOR RULES
+# ----------------------------
+agent_behavior:
+- must_check_memory_bank_on_each_prompt: true
+- must_fetch_new_rules_if_missing: true
+- must_store_fetched_rules: true
+- must_load_rules_before_processing_prompt: true
+- must_fail_safe_if_rule_invalid: true
