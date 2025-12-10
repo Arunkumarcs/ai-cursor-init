@@ -1,0 +1,275 @@
+---
+description: Cursor's Rule generator
+alwaysApply: false
+version: 1.0
+---
+
+# Cursor's Rule generator
+Automatically detect missing Cursor rules and import them from
+"https://cursor.directory/". Save all downloaded rules into `.cursor/rules/`
+and load them as system rules for future use.
+
+# -----------------------------------------------------------
+# 1. Required Folders
+# -----------------------------------------------------------
+filesystem:
+    rules_root: `.cursor/rules/`
+    rule_extension: ".mdc"
+    auto_create: true
+    
+    # Memory Bank Configuration
+    memory_bank_root: `.cursor/rules/memory/`
+    memory_files:
+        - project-context.md   # Project overview, tech stack, conventions
+        - decisions.md         # Architecture Decision Records (ADRs)
+        - gotchas.md          # Known issues and workarounds
+        - progress.md         # Current tasks and progress tracking
+
+# -----------------------------------------------------------
+# 2. Trigger Points
+# -----------------------------------------------------------
+triggers:
+    - on_initialization
+    - on_each_prompt
+    - on_command("/fetch-rule")
+    - on_command("/list-rules")
+    # Memory Bank Triggers
+    - on_command("/memory-status")
+    - on_command("/memory-update")
+    - on_command("/memory-add")
+    - on_command("/memory-clear")
+
+# -----------------------------------------------------------
+# 3. Rule Discovery & Auto-Import Workflow
+# -----------------------------------------------------------
+on_each_prompt:
+steps:
+    - detect_rule_requirement:
+        description: >
+        Analyze the user's prompt to determine if a specific Cursor rule
+        is referenced or needed (e.g., PR review, test generator, memory sync).
+        output: required_rule_name
+
+    - check_if_rule_exists_locally:
+        action: >
+        Look inside `.cursor/rules/` for `ai_<required_rule_name>.mdc`.
+        if_found: "load_rule_into_system"
+        if_missing: "fetch_rule_from_cursor_directory"
+
+# -----------------------------------------------------------
+# 4. Fetch New Rule from cursor.directory
+# -----------------------------------------------------------
+fetch_rule_from_cursor_directory:
+description: >
+    Pull rule template or definition from https://cursor.directory/ based on
+    the required rule name. If no exact match exists, synthesize the rule using
+    Cursor Directory patterns.
+steps:
+    - construct_search_query:
+        query_format: "https://cursor.directory/api/search?q=<required_rule_name>"
+    - retrieve_rule_definition:
+        method: "synthetic-fetch"   # since real network calls aren't available
+    - validate_rule_format
+    - assign_to_variable: rule_definition
+
+output: rule_definition
+
+# -----------------------------------------------------------
+# 5. Store New Rule into Memory Bank
+# -----------------------------------------------------------
+store_rule_in_memory_bank:
+description: >
+    Save the retrieved or synthesized rule into `.cursor/rules/ai_<rule-name>.mdc`.
+write_mode: "overwrite_if_exists"
+file_name: "ai_<required_rule_name>.mdc"
+file_location: ".cursor/rules/"
+
+# -----------------------------------------------------------
+# 6. Load Rule into System
+# -----------------------------------------------------------
+load_rule_into_system:
+description: >
+    Activate the rule so it influences agent behavior immediately.
+apply_priority: high
+merge_strategy: deep
+
+# -----------------------------------------------------------
+# 7. COMMANDS
+# -----------------------------------------------------------
+commands:
+
+/initialize:
+    description: "Check the project and list all rules that are required"
+    usage: "/initialize"
+    steps:
+    - understand the project structure and tech stack
+    - identify missing rules based on project needs
+    - run /fetch-rule for each missing rule
+
+/fetch-rule:
+    description: "Force fetch a rule from cursor.directory"
+    usage: "/fetch-rule <rule-name>"
+    steps:
+    - set required_rule_name from user_input
+    - fetch_rule_from_cursor_directory
+    - store_rule_in_memory_bank
+    - load_rule_into_system
+    response: "Rule <rule-name> fetched and loaded."
+
+/list-rules:
+    description: "List all rules stored in .cursor/rules"
+    action: "enumerate_memory_bank"
+    response_format: |
+    ## Installed Rules
+    - <rule-1>
+    - <rule-2>
+    - ...
+
+/remove-rule:
+    description: "Delete a rule from .cursor/rules"
+    usage: "/remove-rule <rule-name>"
+    action: "delete_rule_file"
+
+/clear-rules:
+    description: "Clear all rules from .cursor/rules"
+    action: "wipe_memory_bank"
+
+/help:
+    description: "Show list of all available commands"
+    return:
+    - "/initialize        : analyze project and fetch required rules"
+    - "/fetch-rule <name> : fetch rule from cursor.directory"
+    - "/list-rules        : list installed rules"
+    - "/remove-rule <name>: remove a rule"
+    - "/clear-rules       : delete all rules"
+    - "/memory-status     : show memory bank contents"
+    - "/memory-update     : update memory files"
+    - "/memory-add <type> : add entry (decision|gotcha|context|progress)"
+    - "/memory-clear      : clear memory file"
+    - "/help              : show this help"
+
+# -----------------------------------------------------------
+# 8. Memory Bank Commands
+# -----------------------------------------------------------
+memory_commands:
+
+/memory-status:
+    description: "Show current memory bank contents summary"
+    usage: "/memory-status"
+    steps:
+    - read all files from `.cursor/rules/memory/`
+    - summarize contents of each file
+    - display formatted summary
+    response_format: |
+      ## Memory Bank Status
+      
+      ### Project Context
+      <summary of project-context.md>
+      
+      ### Recent Decisions
+      <last 3 entries from decisions.md>
+      
+      ### Active Gotchas
+      <count and highlights from gotchas.md>
+      
+      ### Current Progress
+      <active tasks from progress.md>
+
+/memory-update:
+    description: "Prompt to update specific memory files"
+    usage: "/memory-update [file-type]"
+    file_types:
+    - context    # project-context.md
+    - decisions  # decisions.md
+    - gotchas    # gotchas.md
+    - progress   # progress.md
+    steps:
+    - if file_type provided, open that file for editing
+    - if no file_type, show menu of options
+    - validate changes before saving
+    - confirm update completion
+
+/memory-add:
+    description: "Add entry to specific memory file"
+    usage: "/memory-add <type>"
+    types:
+        decision:
+            file: decisions.md
+            template: |
+                ## [YYYY-MM-DD] Decision Title
+                
+                **Status:** Accepted | Deprecated | Superseded
+                **Context:** Why this decision was needed
+                **Decision:** What was decided
+                **Consequences:** Impact and trade-offs
+        
+        gotcha:
+            file: gotchas.md
+            template: |
+                ## Issue Title
+                
+                **Area:** Database | API | Auth | etc.
+                **Problem:** Description of the issue
+                **Solution:** How to handle it
+                **Discovered:** YYYY-MM-DD
+        
+        context:
+            file: project-context.md
+            action: append or update existing section
+        
+        progress:
+            file: progress.md
+            template: |
+                ## Task Title
+                
+                **Status:** In Progress | Blocked | Done
+                **Started:** YYYY-MM-DD
+                **Notes:** Current state, blockers, next steps
+
+/memory-clear:
+    description: "Clear specific memory file (with confirmation)"
+    usage: "/memory-clear <file-type>"
+    steps:
+    - require explicit confirmation
+    - backup current contents
+    - clear file contents
+    - preserve file structure/headers
+    warning: "This action cannot be undone. Type 'CONFIRM' to proceed."
+
+# -----------------------------------------------------------
+# 9. Behavior Requirements
+# -----------------------------------------------------------
+agent_behavior:
+# Rule Management
+- must_check_rules_folder_every_prompt: true
+- must_import_missing_rules: true
+- must_store_imported_rules: true
+- must_load_rules_before_answering: true
+- must_merge_with_existing_rules: true
+- fail_safe_if_invalid_rule: true
+
+# Memory Bank Behavior
+- must_read_memory_on_session_start: true
+- must_preserve_project_memory_context: true
+- must_apply_project_conventions_from_memory: true
+- must_consider_gotchas_when_reviewing_code: true
+- must_track_significant_changes_during_session: true
+
+# -----------------------------------------------------------
+# 10. Memory Bank Auto-Update Triggers
+# -----------------------------------------------------------
+memory_auto_update:
+    on_architectural_decision:
+        action: prompt to add to decisions.md
+        
+    on_bug_or_issue_discovered:
+        action: prompt to add to gotchas.md
+        
+    on_major_feature_completed:
+        action: update progress.md
+        
+    on_convention_established:
+        action: update project-context.md
+        
+    on_session_end:
+        action: prompt to update progress.md if tasks changed
