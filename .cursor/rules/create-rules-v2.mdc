@@ -1,7 +1,7 @@
 ---
 description: Cursor's Rule generator
 alwaysApply: false
-version: 1.1
+version: 1.0
 ---
 
 # Cursor's Rule generator
@@ -98,13 +98,13 @@ merge_strategy: deep
 # -----------------------------------------------------------
 commands:
 
-/inialize:
-    description: check the project and and list all reules that are required 
-    usage: "/inialize"
+/initialize:
+    description: "Check the project and list all rules that are required"
+    usage: "/initialize"
     steps:
-    - understand the project
-    - list all new rules the run 
-    - /fetch-rule <new-rules>
+    - understand the project structure and tech stack
+    - identify missing rules based on project needs
+    - run /fetch-rule for each missing rule
 
 /fetch-rule:
     description: "Force fetch a rule from cursor.directory"
@@ -135,20 +135,21 @@ commands:
     action: "wipe_memory_bank"
 
 /help:
-    description: "Show list of rule commands"
+    description: "Show list of all available commands"
     return:
-    - "/fetch-rule <name> : fetch rule"
+    - "/initialize        : analyze project and fetch required rules"
+    - "/fetch-rule <name> : fetch rule from cursor.directory"
     - "/list-rules        : list installed rules"
-    - "/remove-rule <name>: remove rule"
+    - "/remove-rule <name>: remove a rule"
     - "/clear-rules       : delete all rules"
     - "/memory-status     : show memory bank contents"
     - "/memory-update     : update memory files"
     - "/memory-add <type> : add entry (decision|gotcha|context|progress)"
     - "/memory-clear      : clear memory file"
-    - "/help              : show commands"
+    - "/help              : show this help"
 
 # -----------------------------------------------------------
-# 9. Memory Bank Commands
+# 8. Memory Bank Commands
 # -----------------------------------------------------------
 memory_commands:
 
@@ -236,7 +237,7 @@ memory_commands:
     warning: "This action cannot be undone. Type 'CONFIRM' to proceed."
 
 # -----------------------------------------------------------
-# 8. Behavior Requirements
+# 9. Behavior Requirements
 # -----------------------------------------------------------
 agent_behavior:
 # Rule Management
