@@ -1,0 +1,143 @@
+---
+description: Cursor's Rule generator
+alwaysApply: false
+version: 1.0
+---
+
+# Cursor's Rule generator
+Automatically detect missing Cursor rules and import them from
+"https://cursor.directory/". Save all downloaded rules into `.cursor/rules/`
+and load them as system rules for future use.
+
+# -----------------------------------------------------------
+# 1. Required Folders
+# -----------------------------------------------------------
+filesystem:
+    memory_bank_root: `.cursor/rules/`
+    rule_extension: ".mdc"
+    auto_create: true
+
+# -----------------------------------------------------------
+# 2. Trigger Points
+# -----------------------------------------------------------
+triggers:
+    - on_initialization
+    - on_each_prompt
+    - on_command("/fetch-rule")
+    - on_command("/list-rules")
+
+# -----------------------------------------------------------
+# 3. Rule Discovery & Auto-Import Workflow
+# -----------------------------------------------------------
+on_each_prompt:
+steps:
+    - detect_rule_requirement:
+        description: >
+        Analyze the user's prompt to determine if a specific Cursor rule
+        is referenced or needed (e.g., PR review, test generator, memory sync).
+        output: required_rule_name
+
+    - check_if_rule_exists_locally:
+        action: >
+        Look inside `.cursor/rules/` for `ai_<required_rule_name>.mdc`.
+        if_found: "load_rule_into_system"
+        if_missing: "fetch_rule_from_cursor_directory"
+
+# -----------------------------------------------------------
+# 4. Fetch New Rule from cursor.directory
+# -----------------------------------------------------------
+fetch_rule_from_cursor_directory:
+description: >
+    Pull rule template or definition from https://cursor.directory/ based on
+    the required rule name. If no exact match exists, synthesize the rule using
+    Cursor Directory patterns.
+steps:
+    - construct_search_query:
+        query_format: "https://cursor.directory/api/search?q=<required_rule_name>"
+    - retrieve_rule_definition:
+        method: "synthetic-fetch"   # since real network calls aren't available
+    - validate_rule_format
+    - assign_to_variable: rule_definition
+
+output: rule_definition
+
+# -----------------------------------------------------------
+# 5. Store New Rule into Memory Bank
+# -----------------------------------------------------------
+store_rule_in_memory_bank:
+description: >
+    Save the retrieved or synthesized rule into `.cursor/rules/ai_<rule-name>.mdc`.
+write_mode: "overwrite_if_exists"
+file_name: "ai_<required_rule_name>.mdc"
+file_location: ".cursor/rules/"
+
+# -----------------------------------------------------------
+# 6. Load Rule into System
+# -----------------------------------------------------------
+load_rule_into_system:
+description: >
+    Activate the rule so it influences agent behavior immediately.
+apply_priority: high
+merge_strategy: deep
+
+# -----------------------------------------------------------
+# 7. COMMANDS
+# -----------------------------------------------------------
+commands:
+
+/inialize:
+    description: check the project and and list all reules that are required 
+    usage: "/inialize"
+    steps:
+    - understand the project
+    - list all new rules the run 
+    - /fetch-rule <new-rules>
+
+/fetch-rule:
+    description: "Force fetch a rule from cursor.directory"
+    usage: "/fetch-rule <rule-name>"
+    steps:
+    - set required_rule_name from user_input
+    - fetch_rule_from_cursor_directory
+    - store_rule_in_memory_bank
+    - load_rule_into_system
+    response: "Rule <rule-name> fetched and loaded."
+
+/list-rules:
+    description: "List all rules stored in .cursor/rules"
+    action: "enumerate_memory_bank"
+    response_format: |
+    ## Installed Rules
+    - <rule-1>
+    - <rule-2>
+    - ...
+
+/remove-rule:
+    description: "Delete a rule from .cursor/rules"
+    usage: "/remove-rule <rule-name>"
+    action: "delete_rule_file"
+
+/clear-rules:
+    description: "Clear all rules from .cursor/rules"
+    action: "wipe_memory_bank"
+
+/help:
+    description: "Show list of rule commands"
+    return:
+    - "/fetch-rule <name> : fetch rule"
+    - "/list-rules        : list installed rules"
+    - "/remove-rule <name>: remove rule"
+    - "/clear-rules       : delete all rules"
+    - "/help              : show commands"
+
+# -----------------------------------------------------------
+# 8. Behavior Requirements
+# -----------------------------------------------------------
+agent_behavior:
+- must_check_memory_bank_every_prompt: true
+- must_import_missing_rules: true
+- must_store_imported_rules: true
+- must_load_rules_before_answering: true
+- must_merge_with_existing_rules: true
+- must_preserve_project_memory_context: true
+- fail_safe_if_invalid_rule: true
