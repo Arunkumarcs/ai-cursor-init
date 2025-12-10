@@ -1,0 +1,90 @@
+---
+description: Memory Bank - Persistent AI Context System
+alwaysApply: true
+version: 1.1
+---
+
+# Memory Bank System
+
+The Memory Bank is a persistent knowledge system that maintains AI context across sessions.
+It ensures consistent, informed assistance by preserving project knowledge, decisions, and patterns.
+
+## Memory Bank Location
+
+All memory files are stored in: `memory-bank/`
+
+## Core Memory Files
+
+| File | Purpose | Update Frequency |
+|------|---------|------------------|
+| `projectBrief.md` | Project overview, goals, scope | Rarely (foundation doc) |
+| `productContext.md` | Why project exists, problems solved | When goals change |
+| `systemPatterns.md` | Architecture, patterns, decisions | When patterns evolve |
+| `techContext.md` | Tech stack, dependencies, setup | When stack changes |
+| `activeContext.md` | Current work, focus areas | Every session |
+| `progress.md` | Status, completions, blockers | After milestones |
+
+## Additional Memory Files
+
+| File | Purpose | Update Frequency |
+|------|---------|------------------|
+| `decisions.md` | ADRs with context, alternatives, consequences | When decisions made |
+| `errors.md` | Known issues, debugging tips, common fixes | When bugs discovered |
+
+## Behavior Rules
+
+### On Session Start
+1. Read ALL memory bank files before responding
+2. Understand current project context and active work
+3. Review recent decisions and patterns
+
+### During Session
+1. Apply patterns from `systemPatterns.md` consistently
+2. Follow conventions documented in memory files
+3. Update `activeContext.md` when work focus changes
+4. Reference `errors.md` when debugging similar issues
+
+### On Significant Changes
+1. Update relevant memory files when:
+   - New architectural decisions are made
+   - Patterns or conventions are established
+   - Technical stack changes
+   - Major features are completed
+   - Bugs or gotchas are discovered
+
+### Memory Update Commands
+- `/memory-update` - Prompt to update memory files based on session
+- `/memory-status` - Show current memory bank contents
+- `/memory-init` - Initialize/reset memory bank
+
+## File Format Guidelines
+
+Each memory file should:
+- Use clear Markdown formatting
+- Include `> Last Updated: YYYY-MM-DD` header for staleness tracking
+- Be concise but comprehensive
+- Cross-reference related files when needed
+
+## Context Management
+
+### File Size Guidelines
+- Keep individual files under 500 lines
+- Use summaries at top of each file
+- Archive old content to `memory-bank/archive/`
+
+### Staleness Indicators
+- Files not updated in 30+ days should be reviewed
+- Check `Last Updated` timestamps at session start
+
+## Integration with Rules
+
+Memory Bank works alongside `.cursor/rules/`:
+- Rules define HOW to code (patterns, style)
+- Memory defines WHAT we're building (context, decisions)
+
+## Auto-Context Loading
+
+When `alwaysApply: true`, this rule ensures:
+1. Memory context is always available
+2. Responses are consistent with project history
+3. No context is lost between sessions
