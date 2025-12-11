@@ -1,0 +1,326 @@
+# PR Review & GitHub Comments Rule
+
+Guidelines for reviewing Pull Requests and interacting with GitHub comments.
+
+---
+
+## Commands
+
+/pr-review:
+    description: "Full PR review workflow - gather context, analyze changes, provide feedback"
+    usage: "/pr-review <pr-number>"
+    steps:
+    - fetch PR details with `gh pr view <pr-number> --json title,body,files,additions,deletions,author`
+    - get PR diff with `gh pr diff <pr-number>`
+    - check existing comments with `gh api repos/{owner}/{repo}/pulls/<pr-number>/comments`
+    - analyze code changes against review checklist
+    - provide structured feedback with appropriate prefixes
+    - optionally submit review (approve/request-changes/comment)
+
+/pr-view:
+    description: "View PR details, description, and diff"
+    usage: "/pr-view <pr-number>"
+    steps:
+    - fetch PR metadata with `gh pr view <pr-number>`
+    - get file diff with `gh pr diff <pr-number>`
+    - summarize changes and purpose
+    response_format: |
+      ## PR #<number>: <title>
+      
+      **Author:** <author>
+      **Files:** <count> | **+<additions>** / **-<deletions>**
+      
+      ### Description
+      <pr-body>
+      
+      ### Changed Files
+      <file-list>
+
+/pr-comment:
+    description: "Add a comment to PR conversation"
+    usage: "/pr-comment <pr-number> <message>"
+    steps:
+    - validate PR exists
+    - post comment with `gh pr comment <pr-number> --body "<message>"`
+    - confirm comment posted
+
+/pr-approve:
+    description: "Approve PR with optional message"
+    usage: "/pr-approve <pr-number> [message]"
+    default_message: "LGTM! ✅"
+    steps:
+    - validate PR exists and is reviewable
+    - submit approval with `gh pr review <pr-number> --approve --body "<message>"`
+    - confirm approval submitted
+
+/pr-request-changes:
+    description: "Request changes on PR with required feedback"
+    usage: "/pr-request-changes <pr-number> <feedback>"
+    steps:
+    - validate PR exists
+    - submit review with `gh pr review <pr-number> --request-changes --body "<feedback>"`
+    - confirm review submitted
+
+/pr-reply:
+    description: "Reply to an existing PR comment"
+    usage: "/pr-reply <comment-id> <message>"
+    steps:
+    - fetch comment to verify it exists
+    - post reply with `gh api repos/{owner}/{repo}/pulls/comments/<comment-id>/replies -f body="<message>"`
+    - confirm reply posted
+
+/pr-checks:
+    description: "View CI/CD check status for PR"
+    usage: "/pr-checks <pr-number>"
+    steps:
+    - fetch checks with `gh pr checks <pr-number>`
+    - summarize pass/fail/pending status
+    response_format: |
+      ## CI Status for PR #<number>
+      
+      | Check | Status | Duration |
+      |-------|--------|----------|
+      | <check-name> | ✅/❌/⏳ | <time> |
+
+/pr-comments:
+    description: "List all comments on a PR"
+    usage: "/pr-comments <pr-number>"
+    steps:
+    - fetch review comments with `gh api repos/{owner}/{repo}/pulls/<pr-number>/comments`
+    - fetch conversation comments with `gh api repos/{owner}/{repo}/issues/<pr-number>/comments`
+    - format and display all comments
+    response_format: |
+      ## Comments on PR #<number>
+      
+      ### Review Comments (<count>)
+      <inline-code-comments>
+      
+      ### Conversation (<count>)
+      <general-comments>
+
+/pr-help:
+    description: "Show all available PR commands"
+    usage: "/pr-help"
+    return:
+    - "/pr-review <number>         : full PR review workflow"
+    - "/pr-view <number>           : view PR details and diff"
+    - "/pr-comment <number> <msg>  : add comment to PR"
+    - "/pr-approve <number> [msg]  : approve PR"
+    - "/pr-request-changes <n> <msg>: request changes on PR"
+    - "/pr-reply <comment-id> <msg>: reply to comment"
+    - "/pr-checks <number>         : view CI/CD status"
+    - "/pr-comments <number>       : list all PR comments"
+    - "/pr-help                    : show this help"
+
+---
+
+## GitHub CLI Commands
+
+### Reading PR Information
+
+```bash
+# Get PR details
+gh pr view <pr-number>
+
+# Get PR diff
+gh pr diff <pr-number>
+
+# List PR comments
+gh api repos/{owner}/{repo}/pulls/<pr-number>/comments
+
+# List PR review comments (inline code comments)
+gh api repos/{owner}/{repo}/pulls/<pr-number>/reviews
+
+# Get issue/PR comments (conversation tab)
+gh api repos/{owner}/{repo}/issues/<pr-number>/comments
+```
+
+### Adding Comments
+
+```bash
+# Add a general comment to PR conversation
+gh pr comment <pr-number> --body "Your comment here"
+
+# Add inline review comment on specific file/line
+gh api repos/{owner}/{repo}/pulls/<pr-number>/comments \
+  -f body="Comment text" \
+  -f path="src/file.ts" \
+  -f commit_id="<commit-sha>" \
+  -f line=42
+
+# Reply to an existing review comment
+gh api repos/{owner}/{repo}/pulls/comments/<comment-id>/replies \
+  -f body="Reply text"
+```
+
+### Submitting Reviews
+
+```bash
+# Approve PR
+gh pr review <pr-number> --approve --body "LGTM! ✅"
+
+# Request changes
+gh pr review <pr-number> --request-changes --body "Please address the comments"
+
+# Add comment-only review (no approval/rejection)
+gh pr review <pr-number> --comment --body "Some observations..."
+```
+
+## PR Review Workflow
+
+### Step 1: Gather Context
+
+1. Read PR description and linked issues
+2. Check PR size and files changed
+3. Understand the purpose/goal of changes
+
+```bash
+gh pr view <pr-number> --json title,body,files,additions,deletions
+```
+
+### Step 2: Review Code Changes
+
+1. Get the diff and analyze changes
+2. Focus on:
+   - Logic correctness
+   - Error handling
+   - Security implications
+   - Performance considerations
+   - Test coverage
+
+```bash
+gh pr diff <pr-number>
+```
+
+### Step 3: Check Existing Comments
+
+1. Read existing review comments
+2. Check if issues were already raised
+3. Avoid duplicate feedback
+
+```bash
+gh api repos/{owner}/{repo}/pulls/<pr-number>/comments --jq '.[].body'
+```
+
+### Step 4: Provide Feedback
+
+Use clear, actionable comments with these prefixes:
+
+| Prefix | Meaning |
+|--------|---------|
+| `🔴 BLOCKER:` | Must fix before merge |
+| `🟡 SUGGESTION:` | Recommended improvement |
+| `🟢 NIT:` | Minor/optional improvement |
+| `❓ QUESTION:` | Need clarification |
+| `💡 FYI:` | Informational, no action needed |
+
+## Code Review Checklist
+
+### Correctness
+- [ ] Logic is correct and handles edge cases
+- [ ] No obvious bugs or regressions
+- [ ] Meets acceptance criteria from ticket/issue
+
+### Security
+- [ ] No hardcoded secrets or credentials
+- [ ] Input validation present where needed
+- [ ] No SQL injection or XSS vulnerabilities
+- [ ] Proper authentication/authorization checks
+
+### Performance
+- [ ] No N+1 queries or expensive operations in loops
+- [ ] Appropriate caching where beneficial
+- [ ] No memory leaks or resource exhaustion risks
+
+### Code Quality
+- [ ] Follows project conventions and patterns
+- [ ] Clear naming and good readability
+- [ ] Appropriate error handling
+- [ ] No unnecessary complexity
+
+### Testing
+- [ ] Tests cover new functionality
+- [ ] Edge cases are tested
+- [ ] Tests are meaningful (not just coverage)
+
+### Documentation
+- [ ] Complex logic is commented
+- [ ] Public APIs have documentation
+- [ ] README updated if needed
+
+## Comment Templates
+
+### Suggesting a Change
+
+```markdown
+🟡 SUGGESTION: Consider using `Optional` here to make the null handling explicit.
+
+\`\`\`typescript
+// Current
+const value = data?.field;
+
+// Suggested
+const value = Optional.ofNullable(data).map(d => d.field).orElse(defaultValue);
+\`\`\`
+```
+
+### Requesting Clarification
+
+```markdown
+❓ QUESTION: What happens if `userId` is undefined here? Should we add a guard clause?
+```
+
+### Blocking Issue
+
+```markdown
+🔴 BLOCKER: This exposes sensitive user data in the response. We need to filter out the `password` and `ssn` fields before returning.
+
+See: [Security Guidelines](link-to-docs)
+```
+
+### Positive Feedback
+
+```markdown
+💚 Nice refactor! This is much cleaner than the previous implementation.
+```
+
+## Automated Checks
+
+Before approving, verify:
+
+```bash
+# Check CI status
+gh pr checks <pr-number>
+
+# View specific check details
+gh pr checks <pr-number> --json name,state,conclusion
+```
+
+## Updating Comments
+
+```bash
+# Update an existing comment
+gh api repos/{owner}/{repo}/issues/comments/<comment-id> \
+  -X PATCH \
+  -f body="Updated comment text"
+
+# Delete a comment (use sparingly)
+gh api repos/{owner}/{repo}/issues/comments/<comment-id> -X DELETE
+```
+
+## Best Practices
+
+1. **Be constructive** - Focus on the code, not the person
+2. **Be specific** - Point to exact lines and suggest fixes
+3. **Be timely** - Review promptly to unblock teammates
+4. **Be thorough** - One comprehensive review > multiple partial ones
+5. **Acknowledge good work** - Positive feedback matters too
+6. **Ask questions** - When unsure, ask rather than assume
+7. **Link resources** - Reference docs, ADRs, or examples when helpful
+
+## Integration with Memory Bank
+
+After significant PR reviews:
+- Add architectural decisions to `memory-bank/decisions.md`
+- Document discovered gotchas in `memory-bank/errors.md`
+- Update patterns in `memory-bank/systemPatterns.md` if new conventions emerge
